@@ -405,9 +405,9 @@ export default function ParlayBuilder() {
     legsWrap.querySelectorAll<HTMLElement>(".l-pick").forEach(p=>{p.style.fontSize=`${pickSz}px`;});
     legsWrap.querySelectorAll<HTMLElement>(".l-meta").forEach(m=>{m.style.fontSize=`${metaSz}px`;});
     legsWrap.querySelectorAll<HTMLElement>(".l-odds").forEach(o=>{o.style.fontSize=`${oddsSz}px`;});
-  },[legCount,betType,legs,currentFmt,outputMode]);
+  const fit=()=>{const avail=legsWrap.clientHeight,need=legsWrap.scrollHeight;if(need>avail&&avail>0){const k=Math.max(avail/need,0.55);legsWrap.style.gap=`${gap*k}px`;legsWrap.querySelectorAll<HTMLElement>(".leg").forEach(l=>{l.style.padding=`${padV*k}px ${padH*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-icon").forEach(ic=>{const s=iconSz*k;ic.style.width=`${s}px`;ic.style.height=`${s}px`;ic.style.fontSize=`${s*0.54}px`;ic.style.lineHeight=`${s}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-pick").forEach(x=>{x.style.fontSize=`${pickSz*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-meta").forEach(x=>{x.style.fontSize=`${metaSz*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-odds").forEach(x=>{x.style.fontSize=`${oddsSz*k}px`;});}};const fitRaf=requestAnimationFrame(fit);return()=>cancelAnimationFrame(fitRaf);},[legCount,betType,legs,currentFmt,outputMode]);
 
-  const pushRecent=(c:string)=>{
+  useEffect(()=>{setSubtitle(prev=>/\$\d+(\.\d+)?\s*STAKE/i.test(prev)?prev.replace(/\$\d+(\.\d+)?\s*STAKE/i,`$${stake} STAKE`):prev);},[stake]); const pushRecent=(c:string)=>{
     if(!c||c.length!==7) return;
     setRecentAccents(prev=>[c,...prev.filter(x=>x!==c)].slice(0,6));
   };
@@ -818,13 +818,13 @@ export default function ParlayBuilder() {
 
           <Sec title="Bet Type">
             <div style={{display:"flex",gap:7,marginBottom:14}}>
-              <Btn label="Parlay" active={betType==="parlay"} onClick={()=>setBetType("parlay")} acc={C.a}/>
-              <Btn label="Single Bet" active={betType==="single"} onClick={()=>setBetType("single")} acc={C.a}/>
+              <Btn label="Parlay" active={betType==="parlay"} onClick={()=>{setBetType("parlay");setTimeout(startPlay,350);}} acc={C.a}/>
+              <Btn label="Single Bet" active={betType==="single"} onClick={()=>{setBetType("single");setTimeout(startPlay,350);}} acc={C.a}/>
             </div>
             {betType==="parlay"&&<>
               <div style={{fontSize:9,letterSpacing:3,color:"#8a93a5",textTransform:"uppercase",marginBottom:8}}>Legs</div>
               <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:12}}>
-                {[2,3,4,5,6,7,8].map(n=><Btn key={n} label={`${n} Legs`} active={legCount===n} onClick={()=>setLegCount(n)} acc={C.a}/>)}
+                {[2,3,4,5,6,7,8].map(n=><Btn key={n} label={`${n} Legs`} active={legCount===n} onClick={()=>{setLegCount(n);setTimeout(startPlay,300);}} acc={C.a}/>)}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
                 <Fld label="Confidence Bars"><select style={selStyle} value={showConf?"1":"0"} onChange={e=>setShowConf(e.target.value==="1")}><option value="0">Off</option><option value="1">On</option></select></Fld>
@@ -881,7 +881,7 @@ export default function ParlayBuilder() {
               {outputMode==="image"?"⬜ Show Full Card":"▶ Play"}
             </button>
             <button onClick={()=>setLegs(DEFS.slice(0,legCount))} style={{padding:"13px 15px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:9,color:"#f0f2f0",fontFamily:"Anton,sans-serif",fontSize:12,letterSpacing:1,cursor:"pointer"}}>↺</button>
-            <button onClick={()=>setCleanMode(p=>!p)} style={{padding:"13px 12px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:9,color:"#f0f2f0",fontFamily:"Anton,sans-serif",fontSize:11,letterSpacing:1,cursor:"pointer"}}>⛶ Preview</button>
+            <button onClick={()=>{const nx=!cleanMode;setCleanMode(nx);if(nx)setTimeout(startPlay,350);}} style={{padding:"13px 12px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:9,color:"#f0f2f0",fontFamily:"Anton,sans-serif",fontSize:11,letterSpacing:1,cursor:"pointer"}}>⛶ Preview</button>
           </div>
           <button onClick={doDownload} disabled={dlBusy} style={{width:"100%",padding:13,background:"transparent",border:`2px solid ${C.a}`,borderRadius:9,color:C.a,fontFamily:"Anton,sans-serif",fontSize:14,letterSpacing:2,cursor:"pointer",textTransform:"uppercase",marginTop:2,opacity:dlBusy?0.6:1}}>
             {dlBusy?`Processing... ${dlProgress}%`:`⬇ Download ${outputMode==="image"?"PNG":"Video"}`}
