@@ -1,60 +1,60 @@
-import { Button } from "@whop/react/components";
-import { headers } from "next/headers";
-import Link from "next/link";
-import { whopsdk } from "@/lib/whop-sdk";
-
 export default async function DashboardPage({
-	params,
+  params,
 }: {
-	params: Promise<{ companyId: string }>;
+  params: { companyId: string };
 }) {
-	const { companyId } = await params;
-	// Ensure the user is logged in on whop.
-	const { userId } = await whopsdk.verifyUserToken(await headers());
-
-	// Fetch the neccessary data we want from whop.
-	const [company, user, access] = await Promise.all([
-		whopsdk.companies.retrieve(companyId),
-		whopsdk.users.retrieve(userId),
-		whopsdk.users.checkAccess(companyId, { id: userId }),
-	]);
-
-	const displayName = user.name || `@${user.username}`;
-
-	return (
-		<div className="flex flex-col p-8 gap-4">
-			<div className="flex justify-between items-center gap-4">
-				<h1 className="text-9">
-					Hi <strong>{displayName}</strong>!
-				</h1>
-				<Link href="https://docs.whop.com/apps" target="_blank">
-					<Button variant="classic" className="w-full" size="3">
-						Developer Docs
-					</Button>
-				</Link>
-			</div>
-
-			<p className="text-3 text-gray-10">
-				Welcome to you whop app! Replace this template with your own app. To
-				get you started, here's some helpful data you can fetch from whop.
-			</p>
-
-			<h3 className="text-6 font-bold">Company data</h3>
-			<JsonViewer data={company} />
-
-			<h3 className="text-6 font-bold">User data</h3>
-			<JsonViewer data={user} />
-
-			<h3 className="text-6 font-bold">Access data</h3>
-			<JsonViewer data={access} />
-		</div>
-	);
-}
-
-function JsonViewer({ data }: { data: any }) {
-	return (
-		<pre className="text-2 border border-gray-a4 rounded-lg p-4 bg-gray-a2 max-h-72 overflow-y-auto">
-			<code className="text-gray-10">{JSON.stringify(data, null, 2)}</code>
-		</pre>
-	);
+  return (
+    <div style={{
+      background: "#0c0e12",
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "Oswald, sans-serif",
+      color: "#f0f2f0",
+      padding: 40,
+      gap: 24,
+    }}>
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontFamily: "Anton, sans-serif", fontSize: 28, color: "#fff", letterSpacing: 2 }}>Post</span>
+          <span style={{ fontFamily: "Anton, sans-serif", fontSize: 28, color: "#2F64EE", letterSpacing: 2 }}>Labs</span>
+          <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 14, color: "#4a5060", letterSpacing: 3, marginLeft: 10, textTransform: "uppercase" }}>Picks</span>
+        </div>
+        <p style={{ fontSize: 11, color: "#4a5060", letterSpacing: 2, textTransform: "uppercase" }}>Creator Dashboard</p>
+      </div>
+      <div style={{
+        background: "#15181e",
+        border: "1px solid rgba(255,255,255,.07)",
+        borderRadius: 16,
+        padding: 32,
+        maxWidth: 480,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+      }}>
+        <div style={{ fontSize: 9, letterSpacing: 3, color: "#4a5060", textTransform: "uppercase" }}>Community Overview</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[
+            { label: "App", value: "PostLabs Picks" },
+            { label: "Community ID", value: params.companyId.slice(0, 12) + "..." },
+            { label: "Status", value: "✓ Active" },
+            { label: "Version", value: "v1.0" },
+          ].map(s => (
+            <div key={s.label} style={{ background: "#0d0f14", border: "1px solid rgba(255,255,255,.06)", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 8, color: "#4a5060", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontFamily: "Anton, sans-serif", fontSize: 14, color: "#f0f2f0", letterSpacing: 1 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ height: 1, background: "rgba(255,255,255,.05)" }} />
+        <div style={{ fontSize: 10, color: "#4a5060", letterSpacing: 1, lineHeight: 1.6 }}>
+          Your members access <span style={{ color: "#2F64EE" }}>PostLabs Picks</span> through the app tab in your community.
+        </div>
+      </div>
+      <p style={{ fontSize: 8, color: "#2a2f3a", letterSpacing: 2, textTransform: "uppercase" }}>PostLabs · Built for creators</p>
+    </div>
+  );
 }
