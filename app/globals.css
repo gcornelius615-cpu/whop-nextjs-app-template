@@ -136,3 +136,55 @@ body {
   0%,100%{ box-shadow: 0 0 18px rgba(0,0,0,0) }
   50%    { box-shadow: 0 0 40px var(--glow-color, rgba(47,100,238,.4)) }
 }
+
+/* ══ EDITOR GRIDS ══
+   Desktop declarations match the previous inline styles exactly; the classes
+   exist so the mobile breakpoint below can reflow them. */
+.leg-edit-head {
+  display: grid; grid-template-columns: 155px 1fr 1fr 66px 50px 70px 68px;
+  gap: 6px; margin-bottom: 5px;
+}
+.leg-edit-row {
+  display: grid; grid-template-columns: 155px 1fr 1fr 66px 50px 70px 68px;
+  gap: 6px; margin-bottom: 6px; align-items: center;
+}
+.sb-edit-grid {
+  display: grid; grid-template-columns: 155px 1fr 1fr 80px;
+  gap: 8px; align-items: end;
+}
+.color-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 9px; margin-bottom: 10px;
+}
+
+/* ══ MOBILE (≤640px) ══
+   Desktop layout above is untouched; these rules only reflow the editor for
+   small screens. !important is needed to override inline element styles. */
+@media (max-width: 640px) {
+  /* Leg editor: column headers hidden, each leg becomes a labeled card.
+     Sport / Pick / Game stack full-width; Odds+Conf and Lock+Result pair up. */
+  .leg-edit-head { display: none; }
+  .leg-edit-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 10px; padding: 10px;
+    background: #0d0f14;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 9px;
+  }
+  .leg-edit-row > *:nth-child(-n+3) { grid-column: 1 / -1; }
+
+  .sb-edit-grid { grid-template-columns: 1fr 1fr; }
+  .sb-edit-grid > *:nth-child(-n+3) { grid-column: 1 / -1; }
+
+  .color-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Tap targets: 16px font also prevents iOS Safari's focus auto-zoom. */
+  .panel-sec input:not([type="color"]):not([type="range"]):not([type="file"]),
+  .panel-sec select {
+    font-size: 16px !important;
+    min-height: 44px;
+    padding: 8px 10px !important;
+  }
+  .ctl-btn { min-height: 40px; padding: 9px 14px !important; font-size: 11px !important; }
+  .theme-swatch { width: 40px !important; height: 40px !important; }
+}

@@ -3,7 +3,8 @@
 	"version": "0.2.0",
 	"private": true,
 	"scripts": {
-		"dev": "whop-proxy --command 'next dev --turbopack'",
+		"dev": "whop-proxy --command \"next dev --turbopack\"",
+		"dev:local": "next dev --turbopack",
 		"build": "next build",
 		"start": "next start",
 		"lint": "biome lint"

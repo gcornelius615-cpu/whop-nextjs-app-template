@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { fixWebmDuration } from "@/lib/fix-webm-duration";
 
 /* ══ TYPES ══ */
 interface Leg { p:string; g:string; s:string; o:string; c:number; lock:boolean; result:string; }
@@ -108,7 +109,7 @@ function easeOutCubic(t:number):number { return 1-Math.pow(1-t,3); }
 /* ══ UI COMPONENTS ══ */
 function Btn({label,active,onClick,acc}:{label:string;active:boolean;onClick:()=>void;acc:string}) {
   return (
-    <button onClick={onClick} style={{
+    <button className="ctl-btn" onClick={onClick} style={{
       padding:"7px 13px",
       background:active?hexAlpha(acc,0.12):"#0d0f14",
       border:`1px solid ${active?acc:"rgba(255,255,255,.07)"}`,
@@ -134,7 +135,7 @@ const inputStyle:React.CSSProperties = {
 const selStyle:React.CSSProperties = {...inputStyle};
 function Sec({title,children}:{title:string;children:React.ReactNode}) {
   return (
-    <div style={{background:"#15181e",border:"1px solid rgba(255,255,255,.055)",borderRadius:13,padding:"16px 18px"}}>
+    <div className="panel-sec" style={{background:"#15181e",border:"1px solid rgba(255,255,255,.055)",borderRadius:13,padding:"16px 18px"}}>
       <div style={{fontSize:9,letterSpacing:3,color:"#8a93a5",textTransform:"uppercase",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
         {title}<div style={{flex:1,height:1,background:"rgba(255,255,255,.04)"}}/>
       </div>
@@ -229,6 +230,21 @@ export default function ParlayBuilder() {
     if(base&&!base.dataset.bgSrc) base.style.backgroundColor=colors.b;
   },[]);
   useEffect(()=>{applyTheme(C);},[C,applyTheme]);
+
+  /* ── STAGE SCALE (mobile) ──
+     Scale the stage *visually* to fit narrow viewports via a wrapper
+     transform. The stage keeps its real pixel dimensions, so captures and
+     exports are identical to desktop. */
+  const [stageScale,setStageScale]=useState(1);
+  useEffect(()=>{
+    const recalc=()=>{
+      const avail=window.innerWidth-24; // page horizontal padding (12px each side)
+      setStageScale(Math.min(1,avail/currentFmt.w));
+    };
+    recalc();
+    window.addEventListener("resize",recalc);
+    return()=>window.removeEventListener("resize",recalc);
+  },[currentFmt]);
 
   /* ── FORMAT ── */
   const applyFormat = useCallback((fmt:typeof VIDEO_FMTS[0])=>{
@@ -433,6 +449,13 @@ export default function ParlayBuilder() {
     },100);
   });
 
+  /* ── Exact export dimensions (must be even integers for H.264) ── */
+  const exportDims = (fmt:typeof VIDEO_FMTS[0]) => {
+    const w = fmt.tw - (fmt.tw % 2);
+    const rh = Math.round(fmt.h * fmt.tw / fmt.w);
+    return { w, h: rh - (rh % 2) };
+  };
+
   /* ── Capture stage with N legs visible — pixel-perfect via browser rendering ── */
   const captureState = async (lib:SnapLib, visibleLegs:number, scale:number):Promise<HTMLCanvasElement> => {
     const st=stageRef.current!;
@@ -444,14 +467,36 @@ export default function ParlayBuilder() {
     });
     if(bar){bar.style.transition="none";bar.style.width=legEls.length>0?`${(visibleLegs/legEls.length)*100}%`:"100%";}
     await new Promise(r=>setTimeout(r,50));
-    return lib.toCanvas(st,{
+    const raw=await lib.toCanvas(st,{
       pixelRatio: scale,
       backgroundColor: C.b,
       cacheBust: false,
     });
+    // html-to-image sizes its canvas from layout × pixelRatio, which can be off
+    // by a pixel (float rounding, DPR quirks). Social platforms need exact
+    // dimensions, so re-draw onto a fixed-size canvas whenever they differ.
+    const {w:tw,h:th}=exportDims(currentFmt);
+    if(raw.width===tw&&raw.height===th) return raw;
+    const out=document.createElement("canvas");
+    out.width=tw; out.height=th;
+    out.getContext("2d")!.drawImage(raw,0,0,raw.width,raw.height,0,0,tw,th);
+    return out;
   };
 
   /* ── DOWNLOAD ── */
+  // Anchor-download pattern: works in iOS Safari and Android Chrome (no
+  // window.open, no popup blockers). The anchor must be in the DOM on iOS,
+  // and the object URL must outlive the click while the download starts.
+  const triggerDownload=(blob:Blob,filename:string)=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=filename;
+    a.style.display="none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},10000);
+  };
+
   const doDownload=async()=>{
     setDlBusy(true);
     setDlProgress(0);
@@ -465,9 +510,9 @@ export default function ParlayBuilder() {
         // Warm-up render (first render embeds fonts; second is clean)
         await captureState(lib, legEls.length, scale);
         const canvas=await captureState(lib, legEls.length, scale);
-        const a=document.createElement("a");
-        a.download=`postlabs-picks-${currentFmt.id}.png`;
-        a.href=canvas.toDataURL("image/png"); a.click();
+        const blob=await new Promise<Blob|null>(res=>canvas.toBlob(res,"image/png"));
+        if(!blob) throw new Error("PNG encode failed");
+        triggerDownload(blob,`postlabs-picks-${currentFmt.id}.png`);
         setDlMsg("✓ PNG downloaded!");
       }catch(e){
         setDlMsg("Error generating PNG — try again.");
@@ -513,6 +558,7 @@ export default function ParlayBuilder() {
       const chunks:Blob[]=[];
       rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       const recorded:Promise<Blob> = new Promise(res=>{rec.onstop=()=>res(new Blob(chunks,{type:mimeType.split(";")[0]}));});
+      const recStartedAt=performance.now();
       rec.start(100);
 
       const acc=C.a;
@@ -601,11 +647,15 @@ export default function ParlayBuilder() {
         requestAnimationFrame(frame);
       });
 
+      const recordedMs=performance.now()-recStartedAt;
       rec.stop();
-      const blob=await recorded;
-      const a=document.createElement("a");
-      a.download=`postlabs-picks-${currentFmt.id}.${fileExt}`;
-      a.href=URL.createObjectURL(blob); a.click();
+      let blob=await recorded;
+      // MediaRecorder WebM blobs are missing duration metadata, which social
+      // platforms misread on upload. Patch the EBML Duration in before saving.
+      if(fileExt==="webm"){
+        blob=await fixWebmDuration(blob,recordedMs);
+      }
+      triggerDownload(blob,`postlabs-picks-${currentFmt.id}.${fileExt}`);
       setDlMsg("✓ Video downloaded!");
     }catch(e){
       setDlMsg("Video failed — try again.");
@@ -674,6 +724,12 @@ export default function ParlayBuilder() {
         {/* ══ STAGE ══ */}
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,flexShrink:0}}>
           <div style={{fontSize:9,letterSpacing:3,color:"#8a93a5",textTransform:"uppercase",textAlign:"center"}}>{currentFmt.pl} — {currentFmt.sz}</div>
+          {/* Outer div reserves the scaled layout size (transforms don't affect
+              layout); inner div scales the stage visually. The transform lives
+              on the wrapper — NOT on #stage — so html-to-image captures the
+              stage at its true pixel size on every device. */}
+          <div style={{width:currentFmt.w*stageScale,height:currentFmt.h*stageScale}}>
+          <div style={{transform:`scale(${stageScale})`,transformOrigin:"top left"}}>
           <div id="stage" ref={stageRef} style={{
             width:currentFmt.w,height:currentFmt.h,borderRadius:currentFmt.r,
             boxShadow:"0 40px 100px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.05)",
@@ -711,6 +767,8 @@ export default function ParlayBuilder() {
               </div>
             </div>
           </div>
+          </div>
+          </div>
         </div>
 
         {/* ══ PANEL ══ */}
@@ -742,12 +800,12 @@ export default function ParlayBuilder() {
             <div style={{fontSize:9,letterSpacing:3,color:"#8a93a5",textTransform:"uppercase",marginBottom:8}}>Quick Presets</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
               {THEMES.map(t=>(
-                <div key={t.n} onClick={()=>{setC(prev=>({...prev,a:t.a,b:t.b,s:t.s}));pushRecent(t.a);}} title={t.n}
+                <div key={t.n} className="theme-swatch" onClick={()=>{setC(prev=>({...prev,a:t.a,b:t.b,s:t.s}));pushRecent(t.a);}} title={t.n}
                   style={{width:32,height:32,borderRadius:7,cursor:"pointer",border:`2px solid ${C.a===t.a?"#fff":"transparent"}`,background:`linear-gradient(135deg,${t.b},${t.a})`,transition:"all .15s",flexShrink:0}}/>
               ))}
             </div>
             <div style={{fontSize:9,letterSpacing:3,color:"#8a93a5",textTransform:"uppercase",marginBottom:8}}>Custom Colors</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:9,marginBottom:10}}>
+            <div className="color-grid">
               {(["a","b","s","f"] as const).map((ch,i)=>(
                 <div key={ch} style={{background:"#0d0f14",border:"1px solid rgba(255,255,255,.08)",borderRadius:9,padding:"9px 11px"}}>
                   <label style={{fontSize:8,color:"#8a93a5",letterSpacing:1.5,textTransform:"uppercase",display:"block",marginBottom:5}}>{["Accent","Background","Surface","Font"][i]}</label>
@@ -830,13 +888,13 @@ export default function ParlayBuilder() {
                 <Fld label="Confidence Bars"><select style={selStyle} value={showConf?"1":"0"} onChange={e=>setShowConf(e.target.value==="1")}><option value="0">Off</option><option value="1">On</option></select></Fld>
                 <Fld label="Odds Format"><select style={selStyle} value={oddsFmt} onChange={e=>setOddsFmt(e.target.value)}><option value="american">American (+150)</option><option value="decimal">Decimal (2.50)</option><option value="fractional">Fractional (3/2)</option></select></Fld>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"155px 1fr 1fr 66px 50px 70px 68px",gap:6,marginBottom:5}}>
+              <div className="leg-edit-head">
                 {["Sport","Pick","Game / Market","Odds","Conf","Lock","Result"].map(h=>(
                   <span key={h} style={{fontSize:8,color:"#5a6070",letterSpacing:1,textTransform:"uppercase"}}>{h}</span>
                 ))}
               </div>
               {legs.map((l,i)=>(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"155px 1fr 1fr 66px 50px 70px 68px",gap:6,marginBottom:6,alignItems:"center"}}>
+                <div key={i} className="leg-edit-row">
                   <select style={{...selStyle,fontSize:10,padding:"5px 7px"}} value={l.s} onChange={e=>{const nl=[...legs];nl[i]={...nl[i],s:e.target.value};setLegs(nl);}}>
                     {Object.keys(SPORTS).map(k=><option key={k} value={k}>{SPORTS[k].e} {SPORTS[k].l}</option>)}
                   </select>
@@ -855,7 +913,7 @@ export default function ParlayBuilder() {
             </>}
             {betType==="single"&&(
               <div style={{background:"#0d0f14",border:"1px solid rgba(255,255,255,.07)",borderRadius:9,padding:12}}>
-                <div style={{display:"grid",gridTemplateColumns:"155px 1fr 1fr 80px",gap:8,alignItems:"end"}}>
+                <div className="sb-edit-grid">
                   <Fld label="Sport"><select style={selStyle} value={sbSport} onChange={e=>setSbSport(e.target.value)}>{Object.keys(SPORTS).map(k=><option key={k} value={k}>{SPORTS[k].e} {SPORTS[k].l}</option>)}</select></Fld>
                   <Fld label="Your Pick"><input style={selStyle} value={sbPick} onChange={e=>setSbPick(e.target.value)}/></Fld>
                   <Fld label="Game / Market"><input style={selStyle} value={sbGame} onChange={e=>setSbGame(e.target.value)}/></Fld>
