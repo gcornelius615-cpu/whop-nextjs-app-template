@@ -423,7 +423,9 @@ export default function ParlayBuilder() {
     legsWrap.querySelectorAll<HTMLElement>(".l-odds").forEach(o=>{o.style.fontSize=`${oddsSz}px`;});
   const fit=()=>{const avail=legsWrap.clientHeight,need=legsWrap.scrollHeight;if(need>avail&&avail>0){const k=Math.max(avail/need,0.55);legsWrap.style.gap=`${gap*k}px`;legsWrap.querySelectorAll<HTMLElement>(".leg").forEach(l=>{l.style.padding=`${padV*k}px ${padH*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-icon").forEach(ic=>{const s=iconSz*k;ic.style.width=`${s}px`;ic.style.height=`${s}px`;ic.style.fontSize=`${s*0.54}px`;ic.style.lineHeight=`${s}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-pick").forEach(x=>{x.style.fontSize=`${pickSz*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-meta").forEach(x=>{x.style.fontSize=`${metaSz*k}px`;});legsWrap.querySelectorAll<HTMLElement>(".l-odds").forEach(x=>{x.style.fontSize=`${oddsSz*k}px`;});}};const fitRaf=requestAnimationFrame(fit);return()=>cancelAnimationFrame(fitRaf);},[legCount,betType,legs,currentFmt,outputMode]);
 
-  useEffect(()=>{setSubtitle(prev=>/\$\d+(\.\d+)?\s*STAKE/i.test(prev)?prev.replace(/\$\d+(\.\d+)?\s*STAKE/i,`$${stake} STAKE`):prev);},[stake]); const pushRecent=(c:string)=>{
+  // Replacer must be a function: in a replacement *string*, "$1..." is parsed
+  // as a backreference, which turned "$10 STAKE" into "0 STAKE".
+  useEffect(()=>{setSubtitle(prev=>/\$\d+(\.\d+)?\s*STAKE/i.test(prev)?prev.replace(/\$\d+(\.\d+)?\s*STAKE/i,()=>`$${stake} STAKE`):prev);},[stake]); const pushRecent=(c:string)=>{
     if(!c||c.length!==7) return;
     setRecentAccents(prev=>[c,...prev.filter(x=>x!==c)].slice(0,6));
   };
