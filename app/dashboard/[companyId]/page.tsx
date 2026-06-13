@@ -1,8 +1,32 @@
+import { headers } from "next/headers";
+import { whopsdk } from "@/lib/whop-sdk";
+
 export default async function DashboardPage({
   params,
 }: {
-  params: { companyId: string };
+  params: Promise<{ companyId: string }>;
 }) {
+  const { companyId } = await params;
+
+  // Same token gate as the experience view: only render inside Whop.
+  const user = await whopsdk.verifyUserToken(await headers(), { dontThrow: true });
+  if (!user) {
+    return (
+      <div style={{
+        background: "#0c0e12",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Oswald, sans-serif",
+        color: "#f0f2f0",
+        padding: 40,
+      }}>
+        <p style={{ fontSize: 14, letterSpacing: 1 }}>Please open this app through Whop.</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       background: "#0c0e12",
@@ -39,7 +63,7 @@ export default async function DashboardPage({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             { label: "App", value: "PostLabs Picks" },
-            { label: "Community ID", value: params.companyId.slice(0, 12) + "..." },
+            { label: "Community ID", value: companyId.slice(0, 12) + "..." },
             { label: "Status", value: "✓ Active" },
             { label: "Version", value: "v1.0" },
           ].map(s => (
